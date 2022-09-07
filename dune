@@ -1,0 +1,4 @@
+(library
+ (public_name mirage-block-partition)
+ (name mirage_block_partition)
+ (libraries mirage-block lwt))
