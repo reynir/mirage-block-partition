@@ -14,23 +14,27 @@ module Make(B : Mirage_block.S)(P : PARTITION_AT) = struct
   }
 
   type nonrec error = [ 
+    | Mirage_block.error
     | `Block of B.error
-    | `Out_of_bounds ]
+    | `Out_of_bounds
+    | `Bad_partition of string ]
   type nonrec write_error = [
+    | Mirage_block.write_error
     | `Block of B.write_error
     | `Out_of_bounds ]
 
   let pp_error ppf = function
-    | `Block e -> B.pp_error ppf e
+    | `Block e | (#Mirage_block.error as e) -> B.pp_error ppf e
     | `Out_of_bounds -> Fmt.pf ppf "Operation out of partition bounds"
+    | `Bad_partition e -> Fmt.pf ppf "Bad partition: %s" e
 
   let pp_write_error ppf = function
-    | `Block e -> B.pp_write_error ppf e
+    | `Block e | (#Mirage_block.write_error as e) -> B.pp_write_error ppf e
     | `Out_of_bounds -> Fmt.pf ppf "Operation out of partition bounds"
 
   let get_info b =
     let size_sectors = Int64.(succ (sub b.sector_end b.sector_start)) in
-    { b.info with size_sectors }
+    Lwt.return { b.info with size_sectors }
 
   let is_within b sector_start buffers =
     let buffers_len =
@@ -73,10 +77,11 @@ module Make(B : Mirage_block.S)(P : PARTITION_AT) = struct
              rem P.partition_at (of_int info.sector_size))
     in
     if misalignment <> 0L then
-      Lwt.return (Error ("Partition must be aligned with sector size " ^
-                         Int64.to_string misalignment))
+      Lwt.return (Error (`Bad_partition
+                           ("Partition must be aligned with sector size " ^
+                            Int64.to_string misalignment)))
     else if sector_mid < sector_start || sector_mid > sector_end then
-      Lwt.return (Error "Illegal partition point")
+      Lwt.return (Error (`Bad_partition "Illegal partition point"))
     else
       Lwt.return
         (Ok ({ b; info; sector_start; sector_end = sector_mid },
