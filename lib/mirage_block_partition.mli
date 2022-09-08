@@ -3,7 +3,7 @@ module type PARTITION_AT = sig
   val partition_at : int64
 end
 
-module Make(B : Mirage_block.S)(P : PARTITION_AT) : sig
+module Make(B : Mirage_block.S)(_ : PARTITION_AT) : sig
   include Mirage_block.S
   val connect : B.t -> (t * t, error) result Lwt.t
 end
