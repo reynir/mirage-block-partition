@@ -38,18 +38,17 @@ module Make(B : Mirage_block.S)(P : PARTITION_AT) = struct
 
   let is_within b sector_start buffers =
     let buffers_len =
-      buffers
-      |> List.fold_left (fun acc cs -> acc + Cstruct.length cs) 0
-      |> Int64.of_int
+      List.fold_left (fun acc cs -> Int64.(add acc (of_int (Cstruct.length cs))))
+        0L buffers
     in
     let num_sectors =
-      Int64.(add 1L (div
-                       (add buffers_len (pred (of_int b.info.sector_size)))
-                       (of_int b.info.sector_size)))
+      let sector_size = Int64.of_int b.info.sector_size in
+      Int64.(div (add buffers_len (pred sector_size))
+               sector_size)
     in
-    let sector_end = Int64.add sector_start num_sectors in
     let sector_start = Int64.add sector_start b.sector_start in
-    sector_start >= b.sector_start && sector_end < b.sector_end
+    let sector_end = Int64.add sector_start num_sectors in
+    sector_start >= b.sector_start && sector_end <= b.sector_end
 
   let read b sector_start buffers =
     if is_within b sector_start buffers
