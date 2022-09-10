@@ -1,6 +1,6 @@
 module type PARTITION_AT = sig
   (* XXX: should this be in bytes? in sectors?? *)
-  val partition_at : int64
+  val first_length : int64
 end
 
 module Make(B : Mirage_block.S)(P : PARTITION_AT) = struct
@@ -9,7 +9,7 @@ module Make(B : Mirage_block.S)(P : PARTITION_AT) = struct
     info : Mirage_block.info;
     (* inclusive *)
     sector_start : int64;
-    (* inclusive *)
+    (* exclusive *)
     sector_end : int64;
   }
 
@@ -33,7 +33,7 @@ module Make(B : Mirage_block.S)(P : PARTITION_AT) = struct
     | `Out_of_bounds -> Fmt.pf ppf "Operation out of partition bounds"
 
   let get_info b =
-    let size_sectors = Int64.(succ (sub b.sector_end b.sector_start)) in
+    let size_sectors = Int64.(sub b.sector_end b.sector_start) in
     Lwt.return { b.info with size_sectors }
 
   let is_within b sector_start buffers =
@@ -47,9 +47,9 @@ module Make(B : Mirage_block.S)(P : PARTITION_AT) = struct
                        (add buffers_len (pred (of_int b.info.sector_size)))
                        (of_int b.info.sector_size)))
     in
+    let sector_end = Int64.add sector_start num_sectors in
     let sector_start = Int64.add sector_start b.sector_start in
-    sector_start >= b.info.size_sectors ||
-    Int64.(add sector_start num_sectors) >= b.info.size_sectors
+    sector_start >= b.sector_start && sector_end < b.sector_end
 
   let read b sector_start buffers =
     if is_within b sector_start buffers
@@ -71,21 +71,22 @@ module Make(B : Mirage_block.S)(P : PARTITION_AT) = struct
     let ( let* ) = Lwt.bind in
     let* info = B.get_info b in
     let sector_start = 0L
-    and sector_end = Int64.pred info.size_sectors in
+    and sector_end = info.size_sectors in
     let sector_mid, misalignment =
-      Int64.(div P.partition_at (of_int info.sector_size),
-             rem P.partition_at (of_int info.sector_size))
+      Int64.(div P.first_length (of_int info.sector_size),
+             rem P.first_length (of_int info.sector_size))
     in
     if misalignment <> 0L then
       Lwt.return (Error (`Bad_partition
                            ("Partition must be aligned with sector size " ^
-                            Int64.to_string misalignment)))
+                            string_of_int info.sector_size ^ " (" ^
+                            Int64.to_string misalignment ^ " bytes misaligned)")))
     else if sector_mid < sector_start || sector_mid > sector_end then
       Lwt.return (Error (`Bad_partition "Illegal partition point"))
     else
       Lwt.return
         (Ok ({ b; info; sector_start; sector_end = sector_mid },
-             { b; info; sector_start = Int64.succ sector_mid; sector_end }))
+             { b; info; sector_start = sector_mid; sector_end }))
 
   let disconnect b =
     (* XXX disconnect both?! *)

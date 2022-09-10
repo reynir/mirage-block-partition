@@ -1,0 +1,4 @@
+(test
+ (name test_mirage_block_partition)
+ (package mirage-block-partition)
+ (libraries mirage-block-partition mirage-block-combinators lwt lwt.unix alcotest alcotest-lwt))
