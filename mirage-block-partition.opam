@@ -1,0 +1,24 @@
+opam-version: "2.0"
+maintainer: [ "Reynir Björnsson <reynir@reynir.dk>" ]
+authors: [ "Reynir Björnsson <reynir@reynir.dk>" ]
+homepage: "https://github.com/reynir/mirage-block-partition"
+bug-reports: "https://github.com/reynir/mirage-block-partition/issues"
+dev-repo: "git+https://github.com/reynir/mirage-block-partition.git"
+license: "ISC"
+synopsis: "Naïve mirage block device partitioning"
+description: """
+Mirage-block-partition lets you view a mirage block device as smaller partitions.
+"""
+
+build: [
+  [ "dune" "build" "-p" name "-j" jobs ]
+  [ "dune" "runtest" "-p" name "-j" jobs ] { with-test }
+]
+depends: [
+  "mirage-block"
+  "lwt"
+
+  "mirage-block-combinators" { with-test }
+  "alcotest" { with-test }
+  "alcotest-lwt" { with-test }
+]
