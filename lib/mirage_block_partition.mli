@@ -8,6 +8,6 @@ module Make(B : Mirage_block.S) : sig
    * sector size. *)
 
   val subpartition : int64 -> t -> (t * t, error) result
-  (** [connect first_length b] further partitions a partition into two sub
+  (** [subpartition first_length b] further partitions a partition into two sub
    * partitions. [first_length] must be aligned to the sector size. *)
 end
