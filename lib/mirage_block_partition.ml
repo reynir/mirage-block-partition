@@ -1,7 +1,7 @@
 module Make(B : Mirage_block.S) = struct
   type t = {
     b : B.t;
-    info : Mirage_block.info;
+    sector_size : int;
     (* inclusive *)
     sector_start : int64;
     (* exclusive *)
@@ -29,7 +29,8 @@ module Make(B : Mirage_block.S) = struct
 
   let get_info b =
     let size_sectors = Int64.(sub b.sector_end b.sector_start) in
-    Lwt.return { b.info with size_sectors }
+    Lwt.map (fun info -> { info with Mirage_block.size_sectors })
+      (B.get_info b.b)
 
   let is_within b sector_start buffers =
     let buffers_len =
@@ -37,7 +38,7 @@ module Make(B : Mirage_block.S) = struct
         0L buffers
     in
     let num_sectors =
-      let sector_size = Int64.of_int b.info.sector_size in
+      let sector_size = Int64.of_int b.sector_size in
       Int64.(div (add buffers_len (pred sector_size))
                sector_size)
     in
@@ -61,34 +62,30 @@ module Make(B : Mirage_block.S) = struct
     else
       Lwt.return (Error `Out_of_bounds)
 
-  let do_connect b info ~sector_start ~sector_end ~first_length =
+  let partition b ~sector_size ~sector_start ~sector_end ~first_length =
     let sector_mid, misalignment =
-      Int64.(div first_length (of_int info.Mirage_block.sector_size),
-             rem first_length (of_int info.sector_size))
+      Int64.(div first_length (of_int sector_size),
+             rem first_length (of_int sector_size))
     in
     if misalignment <> 0L then
-      Lwt.return (Error (`Bad_partition
-                           ("Partition must be aligned with sector size " ^
-                            string_of_int info.sector_size ^ " (" ^
-                            Int64.to_string misalignment ^ " bytes misaligned)")))
+      Error (`Bad_partition
+               ("Partition must be aligned with sector size " ^
+                string_of_int sector_size ^ " (" ^
+                Int64.to_string misalignment ^ " bytes misaligned)"))
     else if sector_mid < sector_start || sector_mid > sector_end then
-      Lwt.return (Error (`Bad_partition "Illegal partition point"))
+      Error (`Bad_partition "Illegal partition point")
     else
-      Lwt.return
-        (Ok ({ b; info; sector_start; sector_end = sector_mid },
-             { b; info; sector_start = sector_mid; sector_end }))
+      Ok ({ b; sector_size; sector_start; sector_end = sector_mid },
+          { b; sector_size; sector_start = sector_mid; sector_end })
 
   let connect first_length b =
-    let ( let* ) = Lwt.bind in
-    let* info = B.get_info b in
-    let sector_start = 0L
-    and sector_end = info.size_sectors in
-    do_connect b info ~sector_start ~sector_end ~first_length
+    let open Lwt.Syntax in
+    let+ { Mirage_block.sector_size; size_sectors = sector_end; _ } = B.get_info b in
+    let sector_start = 0L in
+    partition b ~sector_size ~sector_start ~sector_end ~first_length
 
-  let connect' first_length b =
-    let sector_start = b.sector_start
-    and sector_end = b.sector_end in
-    do_connect b.b b.info ~sector_start ~sector_end ~first_length
+  let subpartition first_length { b; sector_size; sector_start; sector_end } =
+    partition b ~sector_size ~sector_start ~sector_end ~first_length
 
   let disconnect b =
     (* XXX disconnect both?! *)
