@@ -1,9 +1,7 @@
 open Lwt.Syntax
 
-module P = struct
-  let first_length = 512L
-end
-module Partitioned = Mirage_block_partition.Make(Mirage_block_mem)(P)
+let first_length = 512L
+module Partitioned = Mirage_block_partition.Make(Mirage_block_mem)
 
 let cstruct = Alcotest.testable Cstruct.hexdump_pp Cstruct.equal
 (* XXX: polymorphic compare :'( *)
@@ -12,7 +10,7 @@ let partitioned_write_error = Alcotest.testable Partitioned.pp_write_error (=)
 
 let setup f () =
   let* b = Mirage_block_mem.connect "test" in
-  let* r = Partitioned.connect b in
+  let* r = Partitioned.connect first_length b in
   let b1, b2 =
     match r with
     | Ok (b1, b2) -> b1, b2
@@ -53,7 +51,7 @@ let first_partition_size (b, b1, b2) =
   let+ info = Mirage_block_mem.get_info b
   and+ info1 = Partitioned.get_info b1
   and+ _info2 = Partitioned.get_info b2 in
-  Alcotest.(check int64 "sector_size" P.first_length
+  Alcotest.(check int64 "first_partition_size" first_length
               Int64.(mul info1.size_sectors (of_int info.sector_size)))
 
 let write_first (b, b1, b2) =

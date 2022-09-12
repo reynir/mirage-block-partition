@@ -1,9 +1,4 @@
-module type PARTITION_AT = sig
-  (* XXX: should this be in bytes? in sectors?? *)
-  val first_length : int64
-end
-
-module Make(B : Mirage_block.S)(P : PARTITION_AT) = struct
+module Make(B : Mirage_block.S) = struct
   type t = {
     b : B.t;
     info : Mirage_block.info;
@@ -66,14 +61,10 @@ module Make(B : Mirage_block.S)(P : PARTITION_AT) = struct
     else
       Lwt.return (Error `Out_of_bounds)
 
-  let connect b =
-    let ( let* ) = Lwt.bind in
-    let* info = B.get_info b in
-    let sector_start = 0L
-    and sector_end = info.size_sectors in
+  let do_connect b info ~sector_start ~sector_end ~first_length =
     let sector_mid, misalignment =
-      Int64.(div P.first_length (of_int info.sector_size),
-             rem P.first_length (of_int info.sector_size))
+      Int64.(div first_length (of_int info.Mirage_block.sector_size),
+             rem first_length (of_int info.sector_size))
     in
     if misalignment <> 0L then
       Lwt.return (Error (`Bad_partition
@@ -86,6 +77,18 @@ module Make(B : Mirage_block.S)(P : PARTITION_AT) = struct
       Lwt.return
         (Ok ({ b; info; sector_start; sector_end = sector_mid },
              { b; info; sector_start = sector_mid; sector_end }))
+
+  let connect first_length b =
+    let ( let* ) = Lwt.bind in
+    let* info = B.get_info b in
+    let sector_start = 0L
+    and sector_end = info.size_sectors in
+    do_connect b info ~sector_start ~sector_end ~first_length
+
+  let connect' first_length b =
+    let sector_start = b.sector_start
+    and sector_end = b.sector_end in
+    do_connect b.b b.info ~sector_start ~sector_end ~first_length
 
   let disconnect b =
     (* XXX disconnect both?! *)
