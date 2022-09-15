@@ -1,4 +1,11 @@
 (library
  (public_name mirage-block-partition)
  (name mirage_block_partition)
- (libraries mirage-block lwt))
+ (libraries mirage-block lwt)
+ (modules mirage_block_partition))
+
+(library
+ (public_name mirage-block-partition.mbr)
+ (name mirage_block_partition_mbr)
+ (libraries mirage-block mirage-block-partition mbr-format lwt)
+ (modules mirage_block_partition_mbr))
