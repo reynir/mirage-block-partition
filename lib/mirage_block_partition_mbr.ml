@@ -2,11 +2,18 @@ module Make(B : Mirage_block.S) = struct
   module P = Mirage_block_partition.Make(B)
   include P
 
-  type partition =
+  type connect_error = [
+    | `Bad_partition of string
+    | `Overlapping_partitions
+    | `Mbr_read of P.error
+    | `Bad_mbr of string
+  ]
+
+  type section =
     | Empty of int64
     | Partition of Mbr.Partition.t * int64
 
-  let partitioning partitions =
+  let sections offset partitions : (_, [> connect_error]) result =
     List.fold_left
       (fun r p ->
          let ( let* ) = Result.bind in
@@ -28,14 +35,13 @@ module Make(B : Mirage_block.S) = struct
              p :: ps
          in
          Ok (Int64.add sector_start size_sectors, ps))
-      (Ok (1L, []))
+      (Ok (offset, []))
       partitions
     |> Result.map snd
     |> Result.map List.rev
 
 
-  let connect b (mbr : Mbr.t) =
-    let open Lwt.Infix in
+  let subpartition b offset (mbr : Mbr.t) : (_, [> connect_error]) result =
     let partitions =
       List.sort (fun p1 p2 ->
           Int32.unsigned_compare
@@ -43,30 +49,47 @@ module Make(B : Mirage_block.S) = struct
             p2.Mbr.Partition.first_absolute_sector_lba)
         mbr.partitions
     in
-    match partitioning partitions with
-    | Error _ as e -> Lwt.return e
+    match sections offset partitions with
+    | Error _ as e -> e
     | Ok partitioning ->
-      P.connect 1L b >>= fun r ->
+      List.fold_left
+        (fun acc p ->
+           let ( let* ) = Result.bind in
+           let* rest, ps = acc in
+           match p with
+           | Empty length ->
+             let* _, rest = P.subpartition length rest in
+             Ok (rest, ps)
+           | Partition (p, length) ->
+             let* b, rest = P.subpartition length rest in
+             Ok (rest, (p, b) :: ps))
+        (Ok (b, []))
+        partitioning
+      |> Result.map snd
+      |> Result.map List.rev
+
+  let connect b : (_, connect_error) result Lwt.t =
+    let open Lwt.Infix in
+    B.get_info b >>= fun { Mirage_block.sector_size; _ } ->
+    let mbr_sectors = Int64.of_int ((Mbr.sizeof + sector_size - 1) / sector_size) in
+    P.connect mbr_sectors b >>= fun r ->
+    match r with
+    | Error _ as e -> Lwt.return e
+    | Ok (mbr, rest) ->
+      let buf = Cstruct.create (sector_size * Int64.to_int mbr_sectors) in
+      P.read mbr 0L [buf] >>= fun r ->
       match r with
-      | Error _ as e -> Lwt.return e
-      | Ok (_, rest) ->
-        let r =
-          List.fold_left
-            (fun acc p ->
-               let ( let* ) = Result.bind in
-               let* rest, ps = acc in
-               match p with
-               | Empty length ->
-                 let* _, rest = P.subpartition length rest in
-                 Ok (rest, ps)
-               | Partition (p, length) ->
-                 let* b, rest = P.subpartition length rest in
-                 Ok (rest, (p, b) :: ps))
-            (Ok (rest, []))
-            partitioning
-          |> Result.map snd
-          |> Result.map List.rev
-        in
-        Lwt.return r
+      | Error e -> Lwt_result.fail (`Mbr_read e)
+      | Ok () ->
+        match Mbr.unmarshal buf with
+        | Error e -> Lwt_result.fail (`Bad_mbr e)
+        | Ok mbr ->
+          Lwt.return (subpartition rest mbr_sectors mbr)
+
+  let pp_connect_error ppf = function
+    | `Bad_partition m -> Fmt.pf ppf "Bad partition: %s" m
+    | `Overlapping_partitions -> Fmt.pf ppf "Partitions overlap"
+    | `Mbr_read e -> Fmt.pf ppf "Error reading MBR: %a" P.pp_error e
+    | `Bad_mbr e -> Fmt.pf ppf "Bad MBR: %s" e
 end
 
