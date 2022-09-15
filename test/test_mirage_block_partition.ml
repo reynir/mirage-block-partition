@@ -14,7 +14,7 @@ let setup f () =
   let b1, b2 =
     match r with
     | Ok (b1, b2) -> b1, b2
-    | Error e -> Alcotest.failf "Partitioned.connect failed: %a" Partitioned.pp_error e
+    | Error `Bad_partition msg -> Alcotest.failf "Partitioned.connect failed: %s" msg
   in
   let* _ = f (b, b1, b2) in
   let* () = Partitioned.disconnect b2 in
