@@ -32,6 +32,8 @@ module Make(B : Mirage_block.S) = struct
     Lwt.map (fun info -> { info with Mirage_block.size_sectors })
       (B.get_info b.b)
 
+  let get_offset { sector_start; _ } = sector_start
+
   let is_within b sector_start buffers =
     let buffers_len =
       List.fold_left (fun acc cs -> Int64.(add acc (of_int (Cstruct.length cs))))

@@ -10,4 +10,8 @@ module Make(B : Mirage_block.S) : sig
   val subpartition : int64 -> t -> (t * t, [> `Bad_partition of string ]) result
   (** [subpartition first_length b] further partitions a partition into two sub
       partitions. [first_length] must be aligned to the sector size. *)
+
+  val get_offset : t -> int64
+  (** [get_offset b] is the sector offset of the partition relative to the
+      underlying block device. *)
 end
