@@ -71,6 +71,9 @@ module Make(B : Mirage_block.S) = struct
   let connect b : (_, connect_error) result Lwt.t =
     let open Lwt.Infix in
     B.get_info b >>= fun { Mirage_block.sector_size; _ } ->
+    (* XXX: MBRs *usually* expect a sector size of 512 bytes, and a lot of
+       software will not behave correctly if sector size != 512. Should we
+       error out?! *)
     let mbr_sectors = Int64.of_int ((Mbr.sizeof + sector_size - 1) / sector_size) in
     P.connect mbr_sectors b >>= fun r ->
     match r with
