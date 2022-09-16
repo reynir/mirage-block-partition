@@ -10,7 +10,7 @@ module Make(B : Mirage_block.S) = struct
   ]
 
   type section =
-    | Empty of int64
+    | Unused of int64
     | Partition of Mbr.Partition.t * int64
 
   let sections offset partitions : (_, [> connect_error]) result =
@@ -30,7 +30,7 @@ module Make(B : Mirage_block.S) = struct
          in
          let ps =
            if sector_start > offset then
-             p :: Empty (Int64.sub offset sector_start) :: ps
+             p :: Unused (Int64.sub offset sector_start) :: ps
            else
              p :: ps
          in
@@ -57,7 +57,7 @@ module Make(B : Mirage_block.S) = struct
            let ( let* ) = Result.bind in
            let* rest, ps = acc in
            match p with
-           | Empty length ->
+           | Unused length ->
              let* _, rest = P.subpartition length rest in
              Ok (rest, ps)
            | Partition (p, length) ->
