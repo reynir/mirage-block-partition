@@ -15,10 +15,10 @@ module Make(B : Mirage_block.S)(Clock : Mirage_clock.PCLOCK) = struct
     let open Lwt.Syntax in
     let* r =
       let open Lwt_result.Syntax in
-      (* b1 is the first kilobyte, b2 is the next 4 MB,
+      (* b1 is the first kilobyte, b2 is the next 4 MiB,
          and b3 is the remaining space *)
       let* b1, rest = Partitioned.connect 1024 in
-      let+ b2, b3 = Partitioned.subpartition 0x400000
+      let+ b2, b3 = Partitioned.subpartition 0x400000 rest in
       b1, b2, b3
     in
     match r with
