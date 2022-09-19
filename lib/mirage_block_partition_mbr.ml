@@ -13,7 +13,7 @@ module Make(B : Mirage_block.S) = struct
     | Unused of int64
     | Partition of Mbr.Partition.t * int64
 
-  let sections offset partitions : (_, [> connect_error]) result =
+  let sections offset partitions =
     List.fold_left
       (fun r p ->
          let ( let* ) = Result.bind in
@@ -41,7 +41,7 @@ module Make(B : Mirage_block.S) = struct
     |> Result.map List.rev
 
 
-  let subpartition b offset (mbr : Mbr.t) : (_, [> connect_error]) result =
+  let subpartition b offset sector_size (mbr : Mbr.t) =
     let partitions =
       List.sort (fun p1 p2 ->
           Int32.unsigned_compare
@@ -58,10 +58,10 @@ module Make(B : Mirage_block.S) = struct
            let* rest, ps = acc in
            match p with
            | Unused length ->
-             let* _, rest = P.subpartition length rest in
+             let* _, rest = P.subpartition (Int64.mul length sector_size) rest in
              Ok (rest, ps)
            | Partition (p, length) ->
-             let* b, rest = P.subpartition length rest in
+             let* b, rest = P.subpartition (Int64.mul length sector_size) rest in
              Ok (rest, (p, b) :: ps))
         (Ok (b, []))
         partitioning
@@ -87,7 +87,7 @@ module Make(B : Mirage_block.S) = struct
         match Mbr.unmarshal buf with
         | Error e -> Lwt_result.fail (`Bad_mbr e)
         | Ok mbr ->
-          Lwt.return (subpartition rest mbr_sectors mbr)
+          Lwt.return (subpartition rest mbr_sectors sector_size mbr)
 
   let pp_connect_error ppf = function
     | `Bad_partition m -> Fmt.pf ppf "Bad partition: %s" m
