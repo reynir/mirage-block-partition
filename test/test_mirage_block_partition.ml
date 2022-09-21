@@ -1,6 +1,6 @@
 open Lwt.Syntax
 
-let first_length = 512L
+let first_length = 1L
 module Partitioned = Mirage_block_partition.Make(Mirage_block_mem)
 
 let cstruct = Alcotest.testable Cstruct.hexdump_pp Cstruct.equal
@@ -14,7 +14,7 @@ let setup f () =
   let b1, b2 =
     match r with
     | Ok (b1, b2) -> b1, b2
-    | Error `Bad_partition msg -> Alcotest.failf "Partitioned.connect failed: %s" msg
+    | Error `Bad_partition -> Alcotest.failf "Partitioned.connect: bad partition point"
   in
   let* _ = f (b, b1, b2) in
   let* () = Partitioned.disconnect b2 in
@@ -47,12 +47,9 @@ let total_size (b, b1, b2) =
   and b2_size = mul info2.size_sectors (of_int info2.sector_size) in
   Alcotest.(check int64 "total_size" b_size (add b1_size b2_size))
 
-let first_partition_size (b, b1, b2) =
-  let+ info = Mirage_block_mem.get_info b
-  and+ info1 = Partitioned.get_info b1
-  and+ _info2 = Partitioned.get_info b2 in
-  Alcotest.(check int64 "first_partition_size" first_length
-              Int64.(mul info1.size_sectors (of_int info.sector_size)))
+let first_partition_size (_b, b1, _b2) =
+  let+ info1 = Partitioned.get_info b1 in
+  Alcotest.(check int64 "first_partition_size" first_length info1.size_sectors)
 
 let write_first (b, b1, b2) =
   let* info = Mirage_block_mem.get_info b

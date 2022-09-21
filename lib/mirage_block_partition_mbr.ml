@@ -3,10 +3,11 @@ module Make(B : Mirage_block.S) = struct
   include P
 
   type connect_error = [
-    | `Bad_partition of string
+    | `Bad_partition
     | `Overlapping_partitions
     | `Mbr_read of P.error
     | `Bad_mbr of string
+    | `Sector_size of int
   ]
 
   type section =
@@ -41,7 +42,7 @@ module Make(B : Mirage_block.S) = struct
     |> Result.map List.rev
 
 
-  let subpartition b offset sector_size (mbr : Mbr.t) =
+  let subpartition b (mbr : Mbr.t) =
     let partitions =
       List.sort (fun p1 p2 ->
           Int32.unsigned_compare
@@ -49,7 +50,7 @@ module Make(B : Mirage_block.S) = struct
             p2.Mbr.Partition.first_absolute_sector_lba)
         mbr.partitions
     in
-    match sections offset partitions with
+    match sections (P.get_offset b) partitions with
     | Error _ as e -> e
     | Ok partitioning ->
       List.fold_left
@@ -58,10 +59,10 @@ module Make(B : Mirage_block.S) = struct
            let* rest, ps = acc in
            match p with
            | Unused length ->
-             let* _, rest = P.subpartition (Int64.mul length sector_size) rest in
+             let* _, rest = P.subpartition length rest in
              Ok (rest, ps)
            | Partition (p, length) ->
-             let* b, rest = P.subpartition (Int64.mul length sector_size) rest in
+             let* b, rest = P.subpartition length rest in
              Ok (rest, (p, b) :: ps))
         (Ok (b, []))
         partitioning
@@ -70,29 +71,29 @@ module Make(B : Mirage_block.S) = struct
 
   let connect b : (_, connect_error) result Lwt.t =
     let open Lwt.Infix in
+    let open Lwt_result.Syntax in
     B.get_info b >>= fun { Mirage_block.sector_size; _ } ->
     (* XXX: MBRs *usually* expect a sector size of 512 bytes, and a lot of
-       software will not behave correctly if sector size != 512. Should we
-       error out?! *)
-    let mbr_sectors = Int64.of_int ((Mbr.sizeof + sector_size - 1) / sector_size) in
-    P.connect mbr_sectors b >>= fun r ->
-    match r with
-    | Error _ as e -> Lwt.return e
-    | Ok (mbr, rest) ->
-      let buf = Cstruct.create (sector_size * Int64.to_int mbr_sectors) in
-      P.read mbr 0L [buf] >>= fun r ->
-      match r with
-      | Error e -> Lwt_result.fail (`Mbr_read e)
-      | Ok () ->
-        match Mbr.unmarshal buf with
-        | Error e -> Lwt_result.fail (`Bad_mbr e)
-        | Ok mbr ->
-          Lwt.return (subpartition rest mbr_sectors sector_size mbr)
+       software will not behave correctly if sector size != 512. *)
+    let* () =
+      if sector_size <> Mbr.sizeof then
+        Lwt_result.fail (`Sector_size sector_size)
+      else
+        Lwt_result.return ()
+    in
+    let* (mbr, rest) = P.connect 1L b in
+    let buf = Cstruct.create Mbr.sizeof in
+    let* () = P.read mbr 0L [buf] |> Lwt_result.map_error (fun e -> `Mbr_read e) in
+    match Mbr.unmarshal buf with
+    | Error e -> Lwt_result.fail (`Bad_mbr e)
+    | Ok mbr ->
+      Lwt.return (subpartition rest mbr)
 
   let pp_connect_error ppf = function
-    | `Bad_partition m -> Fmt.pf ppf "Bad partition: %s" m
+    | `Bad_partition -> Fmt.pf ppf "Bad partition point"
     | `Overlapping_partitions -> Fmt.pf ppf "Partitions overlap"
     | `Mbr_read e -> Fmt.pf ppf "Error reading MBR: %a" P.pp_error e
     | `Bad_mbr e -> Fmt.pf ppf "Bad MBR: %s" e
+    | `Sector_size s -> Fmt.pf ppf "Bad sector size: %d != 512" s
 end
 
