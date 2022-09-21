@@ -11,8 +11,7 @@ module Make(B : Mirage_block.S) = struct
   type nonrec error = [ 
     | Mirage_block.error
     | `Block of B.error
-    | `Out_of_bounds
-    | `Bad_partition of string ]
+    | `Out_of_bounds ]
   type nonrec write_error = [
     | Mirage_block.write_error
     | `Block of B.write_error
@@ -21,7 +20,6 @@ module Make(B : Mirage_block.S) = struct
   let pp_error ppf = function
     | `Block e | (#Mirage_block.error as e) -> B.pp_error ppf e
     | `Out_of_bounds -> Fmt.pf ppf "Operation out of partition bounds"
-    | `Bad_partition e -> Fmt.pf ppf "Bad partition: %s" e
 
   let pp_write_error ppf = function
     | `Block e | (#Mirage_block.write_error as e) -> B.pp_write_error ppf e
@@ -49,6 +47,8 @@ module Make(B : Mirage_block.S) = struct
     sector_start >= b.sector_start && sector_end <= b.sector_end
 
   let read b sector_start buffers =
+    (* XXX: here and in [write] we rely on the underlying block device to check
+       for alignment issues of [buffers]. *)
     if is_within b sector_start buffers
     then
       B.read b.b (Int64.add b.sector_start sector_start) buffers
@@ -64,30 +64,21 @@ module Make(B : Mirage_block.S) = struct
     else
       Lwt.return (Error `Out_of_bounds)
 
-  let partition b ~sector_size ~sector_start ~sector_end ~first_length =
-    let sector_mid, misalignment =
-      Int64.(div first_length (of_int sector_size),
-             rem first_length (of_int sector_size))
-    in
-    if misalignment <> 0L then
-      Error (`Bad_partition
-               ("Partition must be aligned with sector size " ^
-                string_of_int sector_size ^ " (" ^
-                Int64.to_string misalignment ^ " bytes misaligned)"))
-    else if sector_mid < sector_start || sector_mid > sector_end then
-      Error (`Bad_partition "Illegal partition point")
+  let partition b ~sector_size ~sector_start ~sector_end ~first_sectors:sector_mid =
+    if sector_mid < sector_start || sector_mid > sector_end then
+      Error `Bad_partition
     else
       Ok ({ b; sector_size; sector_start; sector_end = sector_mid },
           { b; sector_size; sector_start = sector_mid; sector_end })
 
-  let connect first_length b =
+  let connect first_sectors b =
     let open Lwt.Syntax in
     let+ { Mirage_block.sector_size; size_sectors = sector_end; _ } = B.get_info b in
     let sector_start = 0L in
-    partition b ~sector_size ~sector_start ~sector_end ~first_length
+    partition b ~sector_size ~sector_start ~sector_end ~first_sectors
 
-  let subpartition first_length { b; sector_size; sector_start; sector_end } =
-    partition b ~sector_size ~sector_start ~sector_end ~first_length
+  let subpartition first_sectors { b; sector_size; sector_start; sector_end } =
+    partition b ~sector_size ~sector_start ~sector_end ~first_sectors
 
   let disconnect b =
     (* XXX disconnect both?! *)
