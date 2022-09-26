@@ -10,12 +10,7 @@ let partitioned_write_error = Alcotest.testable Partitioned.pp_write_error (=)
 
 let setup f () =
   let* b = Mirage_block_mem.connect "test" in
-  let* r = Partitioned.connect first_length b in
-  let b1, b2 =
-    match r with
-    | Ok (b1, b2) -> b1, b2
-    | Error `Bad_partition -> Alcotest.failf "Partitioned.connect: bad partition point"
-  in
+  let* b1, b2 = Partitioned.connect first_length b in
   let* _ = f (b, b1, b2) in
   let* () = Partitioned.disconnect b2 in
   let* () = Partitioned.disconnect b1 in

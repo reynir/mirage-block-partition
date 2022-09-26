@@ -66,10 +66,9 @@ module Make(B : Mirage_block.S) = struct
 
   let partition b ~sector_size ~sector_start ~sector_end ~first_sectors:sector_mid =
     if sector_mid < sector_start || sector_mid > sector_end then
-      Error `Bad_partition
-    else
-      Ok ({ b; sector_size; sector_start; sector_end = sector_mid },
-          { b; sector_size; sector_start = sector_mid; sector_end })
+      raise (Invalid_argument "Partition point beyond device");
+    ({ b; sector_size; sector_start; sector_end = sector_mid },
+        { b; sector_size; sector_start = sector_mid; sector_end })
 
   let connect first_sectors b =
     let open Lwt.Syntax in
