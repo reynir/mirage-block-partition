@@ -64,8 +64,11 @@ module Make(B : Mirage_block.S) = struct
     else
       Lwt.return (Error `Out_of_bounds)
 
-  let partition b ~sector_size ~sector_start ~sector_end ~first_sectors:sector_mid =
-    if sector_mid < sector_start || sector_mid > sector_end then
+  let partition b ~sector_size ~sector_start ~sector_end ~first_sectors =
+    if first_sectors < 0L then
+      raise (Invalid_argument "Partition point before device");
+    let sector_mid = Int64.add sector_start first_sectors in
+    if sector_mid > sector_end then
       raise (Invalid_argument "Partition point beyond device");
     ({ b; sector_size; sector_start; sector_end = sector_mid },
         { b; sector_size; sector_start = sector_mid; sector_end })
