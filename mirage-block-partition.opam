@@ -20,6 +20,7 @@ depends: [
   "ocaml" {>= "4.08.0"}
   "mirage-block"
   "lwt"
+  "mbr-format"
 
   "mirage-block-combinators" { with-test }
   "alcotest" { with-test }
