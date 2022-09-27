@@ -11,10 +11,13 @@ Mirage-block-partition lets you view a mirage block device as smaller partitions
 """
 
 build: [
+  [ "dune" "subst" ] { dev }
   [ "dune" "build" "-p" name "-j" jobs ]
   [ "dune" "runtest" "-p" name "-j" jobs ] { with-test }
 ]
 depends: [
+  "dune" {>= "3.4"}
+  "ocaml" {>= "4.08.0"}
   "mirage-block"
   "lwt"
 
