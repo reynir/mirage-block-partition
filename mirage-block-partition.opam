@@ -5,7 +5,7 @@ homepage: "https://github.com/reynir/mirage-block-partition"
 bug-reports: "https://github.com/reynir/mirage-block-partition/issues"
 dev-repo: "git+https://github.com/reynir/mirage-block-partition.git"
 license: "ISC"
-synopsis: "Naïve mirage block device partitioning"
+synopsis: "Mirage block device partitioning"
 description: """
 Mirage-block-partition lets you view a mirage block device as smaller partitions.
 """
@@ -18,11 +18,14 @@ build: [
 depends: [
   "dune" {>= "3.4"}
   "ocaml" {>= "4.08.0"}
-  "mirage-block"
-  "lwt"
-  "mbr-format"
+  "mirage-block" {>= "3.0.0"}
+  "lwt" {>= "5.6.0"}
+  "mbr-format" {>= "1.0.0"}
 
   "mirage-block-combinators" { with-test }
   "alcotest" { with-test }
   "alcotest-lwt" { with-test }
+]
+conflicts: [
+  "result" {< "1.5"}
 ]
