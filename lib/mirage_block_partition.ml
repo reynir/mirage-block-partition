@@ -88,7 +88,7 @@ let disconnect b =
     B.disconnect b.b
   (* Otherwise, do not disconnect the underlying block device and inform the user *)
   else
-    let () = Printf.printf "Underlying block device not disconnected\n" in
+    let () = Printf.printf "Underlying block device not disconnected, as it might be used by another partition\n" in
     Lwt.return_unit
 
 
