@@ -82,7 +82,23 @@ module Make(B : Mirage_block.S) = struct
   let subpartition first_sectors { b; sector_size; sector_start; sector_end } =
     partition b ~sector_size ~sector_start ~sector_end ~first_sectors
 
-  let disconnect b =
+   (* let disconnect b =
     (* XXX disconnect both?! *)
+    if b.sector_start = Int64.zero then
+      (* This is the first partition, so we disconnect the underlying block
+         device. *)
     B.disconnect b.b
+    else
+    (* This is not the first partition, so we do not disconnect the underlying
+    block device. *)
+    Lwt.return_unit *)
+let disconnect b =
+  (* If this is the first partition, disconnect the underlying block device *)
+  if b.sector_start = Int64.zero && Int64.equal b.sector_end (Int64.add b.sector_start (Int64.of_int b.sector_size)) then
+    B.disconnect b.b
+  (* Otherwise, do not disconnect the underlying block device *)
+  else
+    Lwt.return_unit
+
+
 end
