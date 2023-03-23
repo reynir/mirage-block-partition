@@ -82,10 +82,23 @@ module Make(B : Mirage_block.S) = struct
   let subpartition first_sectors { b; sector_size; sector_start; sector_end } =
     partition b ~sector_size ~sector_start ~sector_end ~first_sectors
 
-let disconnect b =
+(* let disconnect b =
   (* If this is the first partition, disconnect the underlying block device *)
   if b.sector_start = Int64.zero && Int64.equal b.sector_end (Int64.add b.sector_start (Int64.of_int b.sector_size)) then
     B.disconnect b.b
+  (* Otherwise, do not disconnect the underlying block device and inform the user *)
+  else
+    let () = Printf.printf "Underlying block device not disconnected, as it might be used by another partition\n" in
+    Lwt.return_unit *)
+let disconnect b =
+  (* If this is the first partition, disconnect the underlying block device *)
+  if b.sector_start = Int64.zero && Int64.equal b.sector_end (Int64.add b.sector_start (Int64.of_int b.sector_size)) then
+    let () = Printf.printf "WARNING: The underlying block device might be used by other partitions. Do you want to proceed with disconnection? (y/n): " in
+    let answer = read_line() in
+    if String.lowercase_ascii answer = "y" then
+      B.disconnect b.b
+    else
+      Lwt.return_unit
   (* Otherwise, do not disconnect the underlying block device and inform the user *)
   else
     let () = Printf.printf "Underlying block device not disconnected, as it might be used by another partition\n" in
