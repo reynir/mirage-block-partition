@@ -92,12 +92,22 @@ module Make(B : Mirage_block.S) = struct
     (* This is not the first partition, so we do not disconnect the underlying
     block device. *)
     Lwt.return_unit *)
-let disconnect b =
+(* let disconnect b =
   (* If this is the first partition, disconnect the underlying block device *)
   if b.sector_start = Int64.zero && Int64.equal b.sector_end (Int64.add b.sector_start (Int64.of_int b.sector_size)) then
     B.disconnect b.b
   (* Otherwise, do not disconnect the underlying block device *)
   else
+        Printf.printf "Underlying block device not disconnected\n";
+
+    Lwt.return_unit *)
+let disconnect b =
+  (* If this is the first partition, disconnect the underlying block device *)
+  if b.sector_start = Int64.zero && Int64.equal b.sector_end (Int64.add b.sector_start (Int64.of_int b.sector_size)) then
+    B.disconnect b.b
+  (* Otherwise, do not disconnect the underlying block device and inform the user *)
+  else
+    let () = Printf.printf "Underlying block device not disconnected\n" in
     Lwt.return_unit
 
 
