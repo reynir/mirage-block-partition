@@ -89,10 +89,7 @@ module Make(B : Mirage_block.S) = struct
       partition b ~sector_size ~sector_start ~sector_end ~first_sectors
   | false ->
       
-      failwith "Cannot subpartition an unconnected block"
-
-
-
+      failwith "unconnected block"
 
 let disconnect b =
   if b.connected then (
@@ -102,6 +99,4 @@ let disconnect b =
   else (
     Lwt.fail_with "Partition is disconnected"
   )
-
-
 end
