@@ -88,8 +88,7 @@ module Make(B : Mirage_block.S) = struct
   | true ->
       partition b ~sector_size ~sector_start ~sector_end ~first_sectors
   | false ->
-      (* Handle the case when connected is false here *)
-      (* For example, you could return an error or an empty partition *)
+      
       failwith "Cannot subpartition an unconnected block"
 
 
