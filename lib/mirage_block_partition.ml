@@ -6,6 +6,8 @@ module Make(B : Mirage_block.S) = struct
     sector_start : int64;
     (* exclusive *)
     sector_end : int64;
+      mutable connected : bool;
+
   }
 
   type nonrec error = [ 
@@ -70,8 +72,8 @@ module Make(B : Mirage_block.S) = struct
     let sector_mid = Int64.add sector_start first_sectors in
     if sector_mid > sector_end then
       raise (Invalid_argument "Partition point beyond device");
-    ({ b; sector_size; sector_start; sector_end = sector_mid },
-        { b; sector_size; sector_start = sector_mid; sector_end })
+    ({ b; sector_size; sector_start; sector_end = sector_mid; connected = true },
+        { b; sector_size; sector_start = sector_mid; sector_end; connected = true })
 
   let connect first_sectors b =
     let open Lwt.Syntax in
@@ -79,30 +81,28 @@ module Make(B : Mirage_block.S) = struct
     let sector_start = 0L in
     partition b ~sector_size ~sector_start ~sector_end ~first_sectors
 
-  let subpartition first_sectors { b; sector_size; sector_start; sector_end } =
-    partition b ~sector_size ~sector_start ~sector_end ~first_sectors
+  (* let subpartition first_sectors { b; sector_size; sector_start; sector_end; connected = true } =
+    partition b ~sector_size ~sector_start ~sector_end ~first_sectors *)
+    let subpartition first_sectors { b; sector_size; sector_start; sector_end; connected } =
+  match connected with
+  | true ->
+      partition b ~sector_size ~sector_start ~sector_end ~first_sectors
+  | false ->
+      (* Handle the case when connected is false here *)
+      (* For example, you could return an error or an empty partition *)
+      failwith "Cannot subpartition an unconnected block"
 
-(* let disconnect b =
-  (* If this is the first partition, disconnect the underlying block device *)
-  if b.sector_start = Int64.zero && Int64.equal b.sector_end (Int64.add b.sector_start (Int64.of_int b.sector_size)) then
-    B.disconnect b.b
-  (* Otherwise, do not disconnect the underlying block device and inform the user *)
-  else
-    let () = Printf.printf "Underlying block device not disconnected, as it might be used by another partition\n" in
-    Lwt.return_unit *)
+
+
+
 let disconnect b =
-  (* If this is the first partition, disconnect the underlying block device *)
-  if b.sector_start = Int64.zero && Int64.equal b.sector_end (Int64.add b.sector_start (Int64.of_int b.sector_size)) then
-    let () = Printf.printf "WARNING: The underlying block device might be used by other partitions. Do you want to proceed with disconnection? (y/n): " in
-    let answer = read_line() in
-    if String.lowercase_ascii answer = "y" then
-      B.disconnect b.b
-    else
-      Lwt.return_unit
-  (* Otherwise, do not disconnect the underlying block device and inform the user *)
-  else
-    let () = Printf.printf "Underlying block device not disconnected, as it might be used by another partition\n" in
+  if b.connected then (
+    b.connected <- false;
     Lwt.return_unit
+  )
+  else (
+    Lwt.fail_with "Partition is disconnected"
+  )
 
 
 end
