@@ -73,26 +73,11 @@ module Make(B : Mirage_block.S) = struct
     ({ b; sector_size; sector_start; sector_end = sector_mid },
         { b; sector_size; sector_start = sector_mid; sector_end })
 
-let connect' ?name ~offset ~size b =
-  let open Lwt.Infix in
-  connect ?name b >>= fun disk ->
-  let sector_size = block_size disk in
-  let page_size = Io_page.page_size in
-  let buffer_size = Int64.(to_int (div size (of_int page_size))) in
-  let buffer = Io_page.(to_cstruct (get buffer_size)) in
-  let buffer_offset = Int64.(to_int (div offset (of_int page_size))) in
-  let read_sector sector =
-    read disk ((sector * sector_size) + (buffer_offset * page_size)) buffer >>= fun () ->
-    return buffer
-  in
-  let write_sector sector buf =
-    write disk ((sector * sector_size) + (buffer_offset * page_size)) buf
-  in
-  let flush () = flush disk in
-  let size_sectors = Int64.(to_int (div size sector_size)) in
-  let id = Id.connect read_sector write_sector flush size_sectors in
-  let partition_offset = Int64.(to_int (div offset sector_size)) in
-  return (Part.make ~offset:partition_offset ~size:size_sectors id)
+  let connect first_sectors b =
+    let open Lwt.Syntax in
+    let+ { Mirage_block.sector_size; size_sectors = sector_end; _ } = B.get_info b in
+    let sector_start = 0L in
+    partition b ~sector_size ~sector_start ~sector_end ~first_sectors
 
   let subpartition first_sectors { b; sector_size; sector_start; sector_end } =
     partition b ~sector_size ~sector_start ~sector_end ~first_sectors
