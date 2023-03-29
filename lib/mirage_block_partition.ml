@@ -96,7 +96,7 @@ module Make(B : Mirage_block.S) = struct
 
 let disconnect b =
   if b.connected then (
-    b.connected <- false;
+    b.connected <- true;
     Lwt.return_unit
   )
   else (
