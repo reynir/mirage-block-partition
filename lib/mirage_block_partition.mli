@@ -17,4 +17,7 @@ module Make(B : Mirage_block.S) : sig
   val get_offset : t -> int64
   (** [get_offset b] is the sector offset of the partition relative to the
       underlying block device. *)
+
+  val connect' : int -> t
+   (* [connect'] takes an offset and a length and returns a single partition. *)
 end

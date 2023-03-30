@@ -79,6 +79,13 @@ module Make(B : Mirage_block.S) = struct
     let sector_start = 0L in
     partition b ~sector_size ~sector_start ~sector_end ~first_sectors
 
+  type connect' = {
+    offset: int;
+    length: int;
+    partition b ~sector_size ~sector_start ~sector_end ~first_sectors
+  }
+
+
   let subpartition first_sectors { b; sector_size; sector_start; sector_end } =
     partition b ~sector_size ~sector_start ~sector_end ~first_sectors
 
