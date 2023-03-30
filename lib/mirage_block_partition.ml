@@ -47,19 +47,20 @@ module Make(B : Mirage_block.S) = struct
     let sector_start = Int64.add sector_start b.sector_start in
     let sector_end = Int64.add sector_start num_sectors in
     sector_start >= b.sector_start && sector_end <= b.sector_end
+      let connected = true (* or false, depending on your needs *)
 
   let read b sector_start buffers =
     (* XXX: here and in [write] we rely on the underlying block device to check
        for alignment issues of [buffers]. *)
-    if is_within b sector_start buffers
-    then
+ if connected && is_within b sector_start buffers then
       B.read b.b (Int64.add b.sector_start sector_start) buffers
       |> Lwt_result.map_error (fun b -> `Block b)
     else
       Lwt.return (Error `Out_of_bounds)
 
+
   let write b sector_start buffers =
-    if is_within b sector_start buffers
+    if connected && is_within b sector_start buffers
     then
       B.write b.b (Int64.add b.sector_start sector_start) buffers
       |> Lwt_result.map_error (fun b -> `Block b)
@@ -97,6 +98,6 @@ let disconnect b =
     Lwt.return_unit
   )
   else (
-    Lwt.fail_with "Partition is disconnected"
+    Lwt.return_unit
   )
 end
