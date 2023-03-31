@@ -6,7 +6,7 @@ module Make(B : Mirage_block.S) = struct
     sector_start : int64;
     (* exclusive *)
     sector_end : int64;
-      mutable connected : bool;
+    mutable connected : bool;
 
   }
 
@@ -26,7 +26,6 @@ module Make(B : Mirage_block.S) = struct
   let pp_write_error ppf = function
     | `Block e | (#Mirage_block.write_error as e) -> B.pp_write_error ppf e
     | `Out_of_bounds -> Fmt.pf ppf "Operation out of partition bounds"
-
 
   let get_info b =
     let size_sectors = Int64.(sub b.sector_end b.sector_start) in
@@ -49,29 +48,25 @@ module Make(B : Mirage_block.S) = struct
     let sector_end = Int64.add sector_start num_sectors in
     sector_start >= b.sector_start && sector_end <= b.sector_end
 
-  
-      let read b sector_start buffers =
-         (* XXX: here and in [write] we rely on the underlying block device to check
+  let read b sector_start buffers =
+    (* XXX: here and in [write] we rely on the underlying block device to check
        for alignment issues of [buffers]. *)
-  if not (is_within b sector_start buffers) then
-    Lwt.return (Error `Out_of_bounds)
-  else if not b.connected then
-    Lwt.return (Error `Disconnected)
-  else
-    B.read b.b (Int64.add b.sector_start sector_start) buffers
-    |> Lwt_result.map_error (fun b -> `Block b)
+    if not (is_within b sector_start buffers) then
+      Lwt.return (Error `Out_of_bounds)
+    else if not b.connected then
+      Lwt.return (Error `Disconnected)
+    else
+      B.read b.b (Int64.add b.sector_start sector_start) buffers
+      |> Lwt_result.map_error (fun b -> `Block b)
 
-
-
-let write b sector_start buffers =
-  if not (is_within b sector_start buffers) then
-    Lwt.return (Error `Out_of_bounds)
-  else if not b.connected then
-    Lwt.return (Error `Disconnected)
-  else
-    B.write b.b (Int64.add b.sector_start sector_start) buffers
-    |> Lwt_result.map_error (fun b -> `Block b)
-
+  let write b sector_start buffers =
+    if not (is_within b sector_start buffers) then
+      Lwt.return (Error `Out_of_bounds)
+    else if not b.connected then
+      Lwt.return (Error `Disconnected)
+    else
+      B.write b.b (Int64.add b.sector_start sector_start) buffers
+      |> Lwt_result.map_error (fun b -> `Block b)
 
   let partition b ~sector_size ~sector_start ~sector_end ~first_sectors =
     if first_sectors < 0L then
@@ -80,7 +75,7 @@ let write b sector_start buffers =
     if sector_mid > sector_end then
       raise (Invalid_argument "Partition point beyond device");
     ({ b; sector_size; sector_start; sector_end = sector_mid; connected = true },
-        { b; sector_size; sector_start = sector_mid; sector_end; connected = true })
+     { b; sector_size; sector_start = sector_mid; sector_end; connected = true })
 
   let connect first_sectors b =
     let open Lwt.Syntax in
@@ -88,21 +83,19 @@ let write b sector_start buffers =
     let sector_start = 0L in
     partition b ~sector_size ~sector_start ~sector_end ~first_sectors
 
-
-    let subpartition first_sectors { b; sector_size; sector_start; sector_end; connected } =
-  match connected with
-  | true ->
+  let subpartition first_sectors { b; sector_size; sector_start; sector_end; connected } =
+    match connected with
+    | true ->
       partition b ~sector_size ~sector_start ~sector_end ~first_sectors
-  | false ->
-      
+    | false ->
       failwith "unconnected block"
 
-let disconnect b =
-  if b.connected then (
-    b.connected <- false;
-    Lwt.return_unit
-  )
-  else (
-    Lwt.return_unit
-  )
+  let disconnect b =
+    if b.connected then (
+      b.connected <- false;
+      Lwt.return_unit
+    )
+    else (
+      Lwt.return_unit
+    )
 end
