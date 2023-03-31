@@ -84,18 +84,13 @@ module Make(B : Mirage_block.S) = struct
     partition b ~sector_size ~sector_start ~sector_end ~first_sectors
 
   let subpartition first_sectors { b; sector_size; sector_start; sector_end; connected } =
-    match connected with
-    | true ->
+    if connected then
       partition b ~sector_size ~sector_start ~sector_end ~first_sectors
-    | false ->
+    else
       failwith "unconnected block"
 
   let disconnect b =
-    if b.connected then (
+    if b.connected then
       b.connected <- false;
-      Lwt.return_unit
-    )
-    else (
-      Lwt.return_unit
-    )
+    Lwt.return_unit
 end
