@@ -11,7 +11,8 @@ module Make(B : Mirage_block.S) : sig
   val subpartition : int64 -> t -> (t * t)
   (** [subpartition first_sectors b] further partitions a partition into two sub
       partitions.
-      @raises Invalid_argument if the partition point is outside the partition.
+      @raises Invalid_argument if the partition point is outside the partition,
+      or if the partition is disconnected.
   *)
 
   val get_offset : t -> int64
