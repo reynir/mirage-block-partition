@@ -87,7 +87,7 @@ module Make(B : Mirage_block.S) = struct
     if connected then
       partition b ~sector_size ~sector_start ~sector_end ~first_sectors
     else
-      failwith "unconnected block"
+      invalid_arg "unconnected block"
 
   let disconnect b =
     if b.connected then
