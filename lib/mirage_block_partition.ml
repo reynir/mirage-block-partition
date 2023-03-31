@@ -1,4 +1,10 @@
+(* Module definition Create using a method that can only be implemented using the Mirage_block.S signature *)
 module Make(B : Mirage_block.S) = struct
+
+ (* The partition's type is defined as a specific implementation of the Mirage_block data structure [b],
+   *sector size [sector_size], sector beginning [sector_start], etc. (inclusive),
+   * in addition to the final section [sector_end] (exclusive) *)
+   
   type t = {
     b : B.t;
     sector_size : int;
@@ -7,7 +13,8 @@ module Make(B : Mirage_block.S) = struct
     (* exclusive *)
     sector_end : int64;
   }
-
+  
+(* Classify errors that can occur during partitioning *)
   type nonrec error = [ 
     | Mirage_block.error
     | `Block of B.error
@@ -17,21 +24,27 @@ module Make(B : Mirage_block.S) = struct
     | `Block of B.write_error
     | `Out_of_bounds ]
 
+(* Identifying error-prone "pretty printers" *)
   let pp_error ppf = function
     | `Block e | (#Mirage_block.error as e) -> B.pp_error ppf e
     | `Out_of_bounds -> Fmt.pf ppf "Operation out of partition bounds"
+    
 
   let pp_write_error ppf = function
     | `Block e | (#Mirage_block.write_error as e) -> B.pp_write_error ppf e
     | `Out_of_bounds -> Fmt.pf ppf "Operation out of partition bounds"
-
+    
+(* Set the number of sectors and obtain information about the underlying Mirage_block implementation. *)
   let get_info b =
     let size_sectors = Int64.(sub b.sector_end b.sector_start) in
     Lwt.map (fun info -> { info with Mirage_block.size_sectors })
       (B.get_info b.b)
-
+      
+(* Get the partition's first sector. *)
   let get_offset { sector_start; _ } = sector_start
 
+
+  (* Verify that the working area of a read or write fits within the partition. *)
   let is_within b sector_start buffers =
     let buffers_len =
       List.fold_left (fun acc cs -> Int64.(add acc (of_int (Cstruct.length cs))))
@@ -46,6 +59,7 @@ module Make(B : Mirage_block.S) = struct
     let sector_end = Int64.add sector_start num_sectors in
     sector_start >= b.sector_start && sector_end <= b.sector_end
 
+(* Perform a read operation, checking to determine if it is inside the partition's limitations or bounds*)
   let read b sector_start buffers =
     (* XXX: here and in [write] we rely on the underlying block device to check
        for alignment issues of [buffers]. *)
@@ -56,6 +70,7 @@ module Make(B : Mirage_block.S) = struct
     else
       Lwt.return (Error `Out_of_bounds)
 
+  (* Perform a write operation, checking to see if it is within the partition's boundaries or limitations *)
   let write b sector_start buffers =
     if is_within b sector_start buffers
     then
