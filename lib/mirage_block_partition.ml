@@ -1,10 +1,5 @@
-(* Module definition Create using a method that can only be implemented using the Mirage_block.S signature *)
 module Make(B : Mirage_block.S) = struct
-
- (* The partition's type is defined as a specific implementation of the Mirage_block data structure [b],
-   *sector size [sector_size], sector beginning [sector_start], etc. (inclusive),
-   * in addition to the final section [sector_end] (exclusive) *)
-   
+ 
   type t = {
     b : B.t;
     sector_size : int;
@@ -14,7 +9,6 @@ module Make(B : Mirage_block.S) = struct
     sector_end : int64;
   }
   
-(* Classify errors that can occur during partitioning *)
   type nonrec error = [ 
     | Mirage_block.error
     | `Block of B.error
@@ -24,7 +18,6 @@ module Make(B : Mirage_block.S) = struct
     | `Block of B.write_error
     | `Out_of_bounds ]
 
-(* Identifying error-prone "pretty printers" *)
   let pp_error ppf = function
     | `Block e | (#Mirage_block.error as e) -> B.pp_error ppf e
     | `Out_of_bounds -> Fmt.pf ppf "Operation out of partition bounds"
@@ -34,13 +27,13 @@ module Make(B : Mirage_block.S) = struct
     | `Block e | (#Mirage_block.write_error as e) -> B.pp_write_error ppf e
     | `Out_of_bounds -> Fmt.pf ppf "Operation out of partition bounds"
     
-(* Set the number of sectors and obtain information about the underlying Mirage_block implementation. *)
+
   let get_info b =
     let size_sectors = Int64.(sub b.sector_end b.sector_start) in
     Lwt.map (fun info -> { info with Mirage_block.size_sectors })
       (B.get_info b.b)
       
-(* Get the partition's first sector. *)
+
   let get_offset { sector_start; _ } = sector_start
 
 
