@@ -7,7 +7,6 @@ module Make(B : Mirage_block.S) = struct
     (* exclusive *)
     sector_end : int64;
     mutable connected : bool;
-
   }
 
   type nonrec error = [ 
@@ -68,26 +67,28 @@ module Make(B : Mirage_block.S) = struct
       B.write b.b (Int64.add b.sector_start sector_start) buffers
       |> Lwt_result.map_error (fun b -> `Block b)
 
-  let partition b ~sector_size ~sector_start ~sector_end ~first_sectors =
-    if first_sectors < 0L then
-      raise (Invalid_argument "Partition point before device");
-    let sector_mid = Int64.add sector_start first_sectors in
-    if sector_mid > sector_end then
-      raise (Invalid_argument "Partition point beyond device");
-    ({ b; sector_size; sector_start; sector_end = sector_mid; connected = true },
-     { b; sector_size; sector_start = sector_mid; sector_end; connected = true })
-
-  let connect first_sectors b =
+  let connect b =
     let open Lwt.Syntax in
     let+ { Mirage_block.sector_size; size_sectors = sector_end; _ } = B.get_info b in
-    let sector_start = 0L in
-    partition b ~sector_size ~sector_start ~sector_end ~first_sectors
+    { b; sector_size; sector_start = 0L; sector_end; connected = true }
 
-  let subpartition first_sectors { b; sector_size; sector_start; sector_end; connected } =
-    if connected then
-      partition b ~sector_size ~sector_start ~sector_end ~first_sectors
-    else
-      invalid_arg "unconnected block"
+  let subpartition ~start ~len t =
+    let ( let* ) = Result.bind in
+    if start < 0L || len < 0L then
+      invalid_arg "Mirage_block_partition.subpartition'";
+    let sector_start = Int64.add t.sector_start start in
+    let sector_end = Int64.add sector_start len in
+    let* () =
+      if sector_start >= t.sector_end || sector_end > t.sector_end then
+        Error `Out_of_bounds
+      else Ok ()
+    in
+    let* () =
+      if not t.connected then
+        Error `Disconnected
+      else Ok ()
+    in
+    Ok { t with sector_start; sector_end }
 
   let disconnect b =
     if b.connected then
