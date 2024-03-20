@@ -10,7 +10,16 @@ let partitioned_write_error = Alcotest.testable Partitioned.pp_write_error (=)
 
 let setup f () =
   let* b = Mirage_block_mem.connect "test" in
-  let* b1, b2 = Partitioned.connect first_length b in
+  let* b' = Partitioned.connect b in
+  let* info = Partitioned.get_info b' in
+  let b1 =
+    Partitioned.subpartition b' ~start:0L ~len:first_length
+    |> Result.get_ok
+  in
+  let b2 =
+    Partitioned.subpartition b' ~start:first_length ~len:(Int64.pred info.size_sectors)
+    |> Result.get_ok
+  in
   let* _ = f (b, b1, b2) in
   let* () = Partitioned.disconnect b2 in
   let* () = Partitioned.disconnect b1 in
