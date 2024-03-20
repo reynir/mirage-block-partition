@@ -23,8 +23,8 @@ depends: [
   "mbr-format" {>= "1.0.0"}
 
   "mirage-block-combinators" { with-test }
-  "alcotest" { with-test }
-  "alcotest-lwt" { with-test }
+  "alcotest" { with-test & >= "1.0.0" }
+  "alcotest-lwt" { with-test & >= "1.0.0" }
 ]
 conflicts: [
   "result" {< "1.5"}
