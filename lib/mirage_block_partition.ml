@@ -1,4 +1,4 @@
-module Make(B : Mirage_block.S) = struct
+module Make (B : Mirage_block.S) = struct
   type t = {
     b : B.t;
     sector_size : int;
@@ -9,14 +9,10 @@ module Make(B : Mirage_block.S) = struct
     mutable connected : bool;
   }
 
-  type nonrec error = [ 
-    | Mirage_block.error
-    | `Block of B.error
-    | `Out_of_bounds ]
-  type nonrec write_error = [
-    | Mirage_block.write_error
-    | `Block of B.write_error
-    | `Out_of_bounds ]
+  type nonrec error = [ Mirage_block.error | `Block of B.error | `Out_of_bounds ]
+
+  type nonrec write_error =
+    [ Mirage_block.write_error | `Block of B.write_error | `Out_of_bounds ]
 
   let pp_error ppf = function
     | `Block e | (#Mirage_block.error as e) -> B.pp_error ppf e
@@ -28,20 +24,21 @@ module Make(B : Mirage_block.S) = struct
 
   let get_info b =
     let size_sectors = Int64.(sub b.sector_end b.sector_start) in
-    Lwt.map (fun info -> { info with Mirage_block.size_sectors })
+    Lwt.map
+      (fun info -> { info with Mirage_block.size_sectors })
       (B.get_info b.b)
 
   let get_offset { sector_start; _ } = sector_start
 
   let is_within b sector_start buffers =
     let buffers_len =
-      List.fold_left (fun acc cs -> Int64.(add acc (of_int (Cstruct.length cs))))
+      List.fold_left
+        (fun acc cs -> Int64.(add acc (of_int (Cstruct.length cs))))
         0L buffers
     in
     let num_sectors =
       let sector_size = Int64.of_int b.sector_size in
-      Int64.(div (add buffers_len (pred sector_size))
-               sector_size)
+      Int64.(div (add buffers_len (pred sector_size)) sector_size)
     in
     let sector_start = Int64.add sector_start b.sector_start in
     let sector_end = Int64.add sector_start num_sectors in
@@ -52,8 +49,7 @@ module Make(B : Mirage_block.S) = struct
        for alignment issues of [buffers]. *)
     if not (is_within b sector_start buffers) then
       Lwt.return (Error `Out_of_bounds)
-    else if not b.connected then
-      Lwt.return (Error `Disconnected)
+    else if not b.connected then Lwt.return (Error `Disconnected)
     else
       B.read b.b (Int64.add b.sector_start sector_start) buffers
       |> Lwt_result.map_error (fun b -> `Block b)
@@ -61,15 +57,16 @@ module Make(B : Mirage_block.S) = struct
   let write b sector_start buffers =
     if not (is_within b sector_start buffers) then
       Lwt.return (Error `Out_of_bounds)
-    else if not b.connected then
-      Lwt.return (Error `Disconnected)
+    else if not b.connected then Lwt.return (Error `Disconnected)
     else
       B.write b.b (Int64.add b.sector_start sector_start) buffers
       |> Lwt_result.map_error (fun b -> `Block b)
 
   let connect b =
     let open Lwt.Syntax in
-    let+ { Mirage_block.sector_size; size_sectors = sector_end; _ } = B.get_info b in
+    let+ { Mirage_block.sector_size; size_sectors = sector_end; _ } =
+      B.get_info b
+    in
     { b; sector_size; sector_start = 0L; sector_end; connected = true }
 
   let subpartition ~start ~len t =
@@ -83,15 +80,10 @@ module Make(B : Mirage_block.S) = struct
         Error `Out_of_bounds
       else Ok ()
     in
-    let* () =
-      if not t.connected then
-        Error `Disconnected
-      else Ok ()
-    in
+    let* () = if not t.connected then Error `Disconnected else Ok () in
     Ok { t with sector_start; sector_end }
 
   let disconnect b =
-    if b.connected then
-      b.connected <- false;
+    if b.connected then b.connected <- false;
     Lwt.return_unit
 end

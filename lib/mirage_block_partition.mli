@@ -1,7 +1,10 @@
-module Make(B : Mirage_block.S) : sig
-  include Mirage_block.S with
-    type error = [ Mirage_block.error | `Block of B.error | `Out_of_bounds ]
-    and type write_error = [ Mirage_block.write_error | `Block of B.write_error | `Out_of_bounds ]
+module Make (B : Mirage_block.S) : sig
+  include
+    Mirage_block.S
+      with type error =
+        [ Mirage_block.error | `Block of B.error | `Out_of_bounds ]
+       and type write_error =
+        [ Mirage_block.write_error | `Block of B.write_error | `Out_of_bounds ]
 
   val connect : B.t -> t Lwt.t
   (** [connect b] is the partition spanning the entire block device [b]. *)

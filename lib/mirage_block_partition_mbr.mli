@@ -1,5 +1,6 @@
-module Make(B : Mirage_block.S) : sig
+module Make (B : Mirage_block.S) : sig
   include Mirage_block.S
+
   val connect : B.t -> ((Mbr.Partition.t * t) list, error) result Lwt.t
   (** [connect b] returns a pair of [Mbr.Partition.t] from the MBR and a
       corresponding device representing the partition. An error is returned if
