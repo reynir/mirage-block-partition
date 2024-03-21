@@ -8,6 +8,8 @@
   `subpartition` then takes labelled arguments `~start` and `~len`. While the
   "split" semantics has some nice properties it does not fit very well with how
   partitions are specified in partition tables (#13 @reynir)
+- mirage-block-partition-mbr is simplified and no longer checks for overlapping
+  partitions. The module may be removed or revised in a future release.
 
 ## v0.1.0
 
